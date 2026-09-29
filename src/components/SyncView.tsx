@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Smartphone, Copy, Check, RefreshCw, Key, Wifi, Play, HelpCircle, Terminal } from 'lucide-react';
+import { Smartphone, Copy, Check, RefreshCw, Key, Wifi, Play, HelpCircle, Terminal, Download, Share2, CheckCircle2 } from 'lucide-react';
 import { TestBench } from './TestBench';
 
 interface SyncViewProps {
@@ -16,6 +16,42 @@ export function SyncView({ onRefreshData }: SyncViewProps) {
   const [isRotating, setIsRotating] = useState(false);
   const [isTestingWebhook, setIsTestingWebhook] = useState(false);
   const [testResult, setTestResult] = useState<any | null>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (window.matchMedia('(display-mode: standalone)').matches) {
+        setIsInstalled(true);
+      }
+      const handleBeforeInstall = (e: Event) => {
+        e.preventDefault();
+        setDeferredPrompt(e);
+      };
+      const handleAppInstalled = () => {
+        setIsInstalled(true);
+        setDeferredPrompt(null);
+      };
+
+      window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.addEventListener('appinstalled', handleAppInstalled);
+
+      return () => {
+        window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+        window.removeEventListener('appinstalled', handleAppInstalled);
+      };
+    }
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setIsInstalled(true);
+    }
+    setDeferredPrompt(null);
+  };
 
   const fetchSettings = async (reveal = false) => {
     try {
@@ -141,6 +177,54 @@ export function SyncView({ onRefreshData }: SyncViewProps) {
         />
       ) : (
         <div className="space-y-4">
+          {/* Mobile App (PWA) Install Card */}
+          <div className="bg-gradient-to-br from-zinc-900 via-zinc-900 to-emerald-950/30 border border-emerald-500/20 p-4 rounded-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+                  <Smartphone className="w-4 h-4 text-emerald-400" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-white">Use on Your Phone (Install App)</h3>
+                  <p className="text-[11px] text-zinc-400">Add to Home Screen for full-screen native app feel</p>
+                </div>
+              </div>
+              {isInstalled && (
+                <span className="flex items-center gap-1 text-[10px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                  <CheckCircle2 className="w-3 h-3" />
+                  Installed
+                </span>
+              )}
+            </div>
+
+            {deferredPrompt && !isInstalled && (
+              <button
+                onClick={handleInstallClick}
+                className="w-full bg-emerald-500 hover:bg-emerald-600 text-zinc-950 font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-2 transition-colors shadow-lg shadow-emerald-500/20"
+              >
+                <Download className="w-4 h-4" />
+                <span>Install UPIPulse App Now</span>
+              </button>
+            )}
+
+            <div className="bg-zinc-950/60 border border-zinc-800/80 p-3 rounded-lg space-y-2 text-[11px] text-zinc-300">
+              <p className="font-semibold text-zinc-200">How to add to phone home screen in 2 taps:</p>
+              <div className="space-y-1.5 pl-1">
+                <div className="flex items-start gap-2">
+                  <span className="text-emerald-400 font-mono font-bold">1.</span>
+                  <span>Open <code className="text-emerald-300 font-mono text-[10px] bg-zinc-900 px-1 py-0.5 rounded">{settings?.webhookUrl?.replace('/api/ingest', '') || 'http://<laptop-ip>:3000'}</code> in your phone&apos;s Chrome browser.</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-emerald-400 font-mono font-bold">2.</span>
+                  <span>Tap Chrome menu (<strong className="text-white">⋮</strong>) &rarr; Tap <strong className="text-emerald-400">&ldquo;Install App&rdquo;</strong> or <strong className="text-emerald-400">&ldquo;Add to Home Screen&rdquo;</strong>.</span>
+                </div>
+              </div>
+              <p className="text-[10px] text-zinc-500 italic pt-1">
+                ★ No APK download needed, no security warnings, and it opens in standalone mode without any browser URL bars!
+              </p>
+            </div>
+          </div>
+
           {/* LAN Connectivity Notice */}
           <div className="bg-zinc-900 border border-zinc-800 p-3.5 rounded-xl space-y-2">
             <div className="flex items-center gap-2 text-xs font-bold text-zinc-200">

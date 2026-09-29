@@ -4,9 +4,10 @@
   "description": "UPIPulse - India-First Personal Finance Tracker",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -H 0.0.0.0",
+    "dev:local": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -H 0.0.0.0",
     "test": "tsx tests/runAllTests.ts"
   },
   "dependencies": {

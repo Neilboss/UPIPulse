@@ -5,6 +5,16 @@ export const metadata: Metadata = {
   title: 'UPIPulse — India Personal Finance',
   description: 'Automated personal finance tracker from bank SMS & UPI notifications',
   manifest: '/manifest.json',
+  icons: {
+    icon: [
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+      { url: '/icon.svg', type: 'image/svg+xml' },
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '192x192', type: 'image/png' },
+    ],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
@@ -30,6 +40,8 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <head>
         <link rel="manifest" href="/manifest.json" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className="bg-background text-zinc-100 min-h-screen selection:bg-emerald-500 selection:text-white pb-20">
         <main className="max-w-md mx-auto min-h-screen flex flex-col px-4 pt-4">
