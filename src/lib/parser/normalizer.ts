@@ -60,7 +60,8 @@ export function preFilterMessage(raw: string): PreFilterResult {
   const promoPatterns = [
     /\bcongratulations!?\s+you\s+are\s+eligible\b/i,
     /\bpre-approved\s+(?:personal\s+)?loan\b/i,
-    /\bapply\s+now\s+for\s+(?:credit\s+card|instant\s+loan)\b/i,
+    /\bapply\s+now\s+for\s+(?:(?:instant|free)\s+)?(?:credit\s+card|personal\s+loan|instant\s+loan|loan)\b/i,
+    /\blifetime\s+free\s+(?:credit\s+card|benefits)\b/i,
     /\binstant\s+loan\s+approval\b/i,
     /\bget\s+flat\s+\d+%\s+off\s+on\b/i,
   ];

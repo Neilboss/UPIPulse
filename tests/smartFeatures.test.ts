@@ -117,4 +117,6 @@ export function runSmartFeatureTests() {
   assert.strictEqual(dupeRes.success, false, 'Duplicate rejected');
   assert.strictEqual(dupeRes.action, 'DUPLICATE', 'Action marked DUPLICATE');
   console.log('  ✓ Local on-device finance service successfully parses, ingests, and dedupes bank SMS offline');
+
+  return { passed: 4, failed: 0 };
 }

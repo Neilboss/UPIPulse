@@ -14,6 +14,8 @@ interface DashboardViewProps {
   onOpenManageAccounts?: () => void;
   onOpenSubscriptions?: () => void;
   onOpenKhata?: () => void;
+  onOpenLogin?: () => void;
+  currentUser?: any;
   cashFlowForecast?: CashFlowForecast | null;
   subscriptionsCount?: number;
   khataSummary?: { totalToReceive: number; totalToPay: number } | null;
@@ -30,6 +32,8 @@ export function DashboardView({
   onOpenManageAccounts,
   onOpenSubscriptions,
   onOpenKhata,
+  onOpenLogin,
+  currentUser,
   cashFlowForecast,
   subscriptionsCount = 0,
   khataSummary,
@@ -63,13 +67,25 @@ export function DashboardView({
           <p className="text-xs text-zinc-400">{currentMonthName}</p>
         </div>
         <div className="flex items-center gap-2">
+          {onOpenLogin && (
+            <button
+              onClick={onOpenLogin}
+              className="text-[11px] bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/70 px-2.5 py-1.5 rounded-full text-zinc-300 flex items-center gap-1.5 transition-colors"
+              title="Account & Dummy Login"
+            >
+              <span className={`w-2 h-2 rounded-full ${currentUser?.isLoggedIn ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+              <span className="font-mono max-w-[110px] truncate">
+                {currentUser?.email ? currentUser.email.split('@')[0] : 'Sign In'}
+              </span>
+            </button>
+          )}
           {onOpenAddExpense && (
             <button
               onClick={onOpenAddExpense}
               className="text-xs bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-zinc-950 font-bold px-3 py-1.5 rounded-full flex items-center gap-1 transition-all shadow-md shadow-emerald-500/20"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Add Expense</span>
+              <span>Add</span>
             </button>
           )}
           <button

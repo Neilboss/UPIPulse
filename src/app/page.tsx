@@ -11,8 +11,10 @@ import { AddExpenseModal } from '../components/AddExpenseModal';
 import { ManageAccountsModal } from '../components/ManageAccountsModal';
 import { SubscriptionsModal } from '../components/SubscriptionsModal';
 import { KhataModal } from '../components/KhataModal';
+import { LoginModal } from '../components/LoginModal';
 import { LocalFinanceService } from '../lib/services/localFinanceService';
 import { SmsBridge } from '../lib/services/smsBridge';
+import { AuthService, AuthUser } from '../lib/services/authService';
 import { calculateCashFlowForecast, CashFlowForecast } from '../lib/forecast/cashFlowPredictor';
 import { detectSubscriptions, SubscriptionItem } from '../lib/detector/subscriptions';
 import { KhataManager } from '../lib/people/khataTracker';
@@ -32,7 +34,9 @@ export default function HomePage() {
   const [subscriptions, setSubscriptions] = useState<SubscriptionItem[]>([]);
   const [khataSummary, setKhataSummary] = useState<{ totalToReceive: number; totalToPay: number } | null>(null);
 
-  // Modals state
+  // Modals & Auth state
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [showLogin, setShowLogin] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [showManageAccounts, setShowManageAccounts] = useState(false);
@@ -129,6 +133,9 @@ export default function HomePage() {
   };
 
   useEffect(() => {
+    const user = AuthService.getCurrentUser();
+    setCurrentUser(user);
+
     loadData(true);
 
     // Register live background SMS listener
@@ -183,6 +190,8 @@ export default function HomePage() {
                 setKhataPrefill(null);
                 setShowKhata(true);
               }}
+              onOpenLogin={() => setShowLogin(true)}
+              currentUser={currentUser}
               cashFlowForecast={cashFlowForecast}
               subscriptionsCount={subscriptions.length}
               khataSummary={khataSummary}
@@ -209,6 +218,17 @@ export default function HomePage() {
           )}
         </>
       )}
+
+      {/* Login & Held Dummy Credentials Modal */}
+      <LoginModal
+        isOpen={showLogin}
+        onClose={() => setShowLogin(false)}
+        onLoginSuccess={(user) => {
+          setCurrentUser(user);
+          setShowLogin(false);
+          loadData(false);
+        }}
+      />
 
       {/* Onboarding Modal for First-Time Users */}
       <OnboardingModal
