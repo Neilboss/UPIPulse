@@ -1,63 +1,106 @@
+<div align="center">
+
 # UPIPulse 🇮🇳 ⚡
 
-**UPIPulse** is an India-first personal finance tracking application designed to convert Indian bank SMS and UPI push notifications (Google Pay, PhonePe, Paytm, CRED) into clean, structured financial insights—**automatically, securely, and 100% locally**.
+**India's smartest UPI & SMS finance tracker — now as a native Android app.**
 
-No account aggregators, no cloud-scraping bank credentials, and no external tracking.
+Auto-reads your bank SMS, tracks spending, forecasts cash flow, and keeps your Khata — all 100% offline and private.
+
+[![Release](https://img.shields.io/github/v/release/Neilboss/UPIPulse?color=brightgreen&label=Latest%20APK)](https://github.com/Neilboss/UPIPulse/releases/latest)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Android-green?logo=android)](https://github.com/Neilboss/UPIPulse/releases/latest)
+[![Built with](https://img.shields.io/badge/built%20with-Next.js%20%2B%20Capacitor-black?logo=next.js)](https://nextjs.org/)
+
+[📲 Download APK](https://github.com/Neilboss/UPIPulse/releases/latest) · [📖 Build Guide](ANDROID.md) · [🐛 Report Bug](https://github.com/Neilboss/UPIPulse/issues)
+
+</div>
+
+---
+
+## 📲 Download & Install
+
+> **No Google Play needed.** Download directly from GitHub Releases.
+
+1. Go to **[Releases → Latest](https://github.com/Neilboss/UPIPulse/releases/latest)** and download `UPIPulse-vX.X.X-debug.apk`
+2. On your phone: **Settings → Security → Install unknown apps** → enable for your browser/files app
+3. Tap the APK → **Install**
+4. Open UPIPulse and grant **SMS permissions** when prompted ✅
 
 ---
 
 ## ✨ Features
 
-- **⚡ Complementary Fusion Engine**: Intelligently merges Google Pay/PhonePe notifications (which have clean merchant names) with Bank SMS alerts (which have account masks and available balances) into a single unified transaction.
-- **🛡️ Multi-Level Deduplication**:
-  - **L1 (Exact UTR / Reference ID)**: Automatically dedupes bank ledger alerts and UPI notifications.
-  - **L2 (Candidate Fingerprint)**: Matches amount, direction, and merchant similarity within a tight time window.
-- **📱 Installable Mobile App (PWA)**: Add UPIPulse directly to your Android or iPhone home screen with 2 taps. Opens in full-screen standalone mode with no browser URL bars.
-- **🤖 Background Automation via MacroDroid**: Silently forwards incoming bank alerts to your private local/cloud webhook in milliseconds.
-- **🏦 Top Indian Banks & UPI Apps Supported**:
-  - **Banks**: HDFC, SBI, ICICI, Axis, Kotak Mahindra, Punjab National Bank (PNB), and generic fallbacks.
-  - **UPI Apps**: Google Pay, PhonePe, Paytm, CRED.
-- **🔍 100% Transparent Ledger**:
-  - Every transaction links back to its original raw SMS/notification text.
-  - Clear **"Last Reported Balance"** timestamps instead of misleading "Live Balance" claims.
-  - Low-confidence or ambiguous alerts are flagged as **"Needs Review"** instead of guessing.
-- **🔒 Privacy-First**: All data is stored in a local SQLite database (`data/upipulse.db`) with WAL mode enabled.
+### 📩 Auto SMS Reading
+Reads your bank transaction SMS automatically — no manual entry needed. Supports real-time capture of new SMS and bulk import of history (last 30/60/90 days).
+
+### 🔮 Cash Flow Forecast
+Predicts your upcoming expenses based on spending patterns. Know how much you'll spend this week *before* it happens.
+
+### 🔁 Subscription Detector
+Automatically identifies recurring charges (Netflix, Spotify, Swiggy One, etc.) from your SMS history. Never miss a silent renewal again.
+
+### 📒 Khata Ledger
+Track money lent to or borrowed from friends. Add entries, mark as settled, and see the running balance — like a digital Udhar book.
+
+### 💸 Smart Transaction Parsing
+Deterministic regex engine parses UPI and bank SMS with high accuracy:
+- **UPI Apps**: Google Pay, PhonePe, Paytm, CRED
+- **Banks**: HDFC, SBI, ICICI, Axis, Kotak, PNB + generic fallbacks
+
+### 🔀 Complementary Fusion Engine
+Merges Google Pay/PhonePe notifications (clean merchant names) with bank SMS (account masks + balance) into a single unified transaction — no duplicates, full context.
+
+### 🛡️ Multi-Level Deduplication
+- **L1 (UTR / Ref ID)** — exact match deduplication
+- **L2 (Fingerprint)** — amount + direction + merchant similarity within a time window
+- **L3 (UPI + Bank SMS Fusion)** — links the UPI confirmation to the bank debit alert
+
+### 🔍 Transparent Ledger
+- Every transaction links back to its original raw SMS text
+- "Last Reported Balance" timestamps (not fake "Live Balance")
+- Low-confidence or ambiguous alerts flagged as **Needs Review**
+
+### 🔒 100% Private & Offline
+All data lives in a local SQLite database on your device. No cloud sync, no account aggregators, no credential scraping.
 
 ---
 
-## 🏗️ Architecture & Pipeline
+## 🏗️ Architecture
 
 ```text
-[Incoming Alert (SMS / UPI Notification)]
+[Incoming SMS / UPI Notification]
              │
              ▼
-     1. Normalize       ── Cleans whitespace, ₹ symbols, currency tokens, amount formatting
+   1. Normalize       ── Cleans whitespace, ₹ symbols, currency tokens
              │
              ▼
-     2. Pre-Filter      ── Drops OTPs, spam, and non-transactional messages
+   2. Pre-Filter      ── Drops OTPs, spam, non-transactional messages
              │
              ▼
-     3. Parse           ── Deterministic regex extraction of amount, direction, merchant, account, balance, UTR
+   3. Parse           ── Regex extraction: amount, direction, merchant, account, balance, UTR
              │
              ▼
-     4. Validate        ── Verifies positive amount, direction, assigns confidence score
+   4. Validate        ── Verifies positive amount, assigns confidence score
              │
              ▼
-     5. Dedup & Fuse    ── Level 1 (UTR) + Level 2 (Fingerprint) + Level 3 (UPI + Bank SMS Fusion)
+   5. Dedup & Fuse    ── L1 (UTR) + L2 (Fingerprint) + L3 (UPI+Bank fusion)
              │
              ▼
-     6. Categorize      ── Smart merchant categorizer (Food, Travel, Shopping, Utilities, etc.)
+   6. Categorize      ── Food, Travel, Shopping, Utilities, Entertainment, etc.
              │
              ▼
-     7. Store & Sync    ── Persisted in local SQLite WAL database; updates reported account balances
+   7. Smart Analysis  ── Subscription detector, cash flow forecast, Khata ledger
+             │
+             ▼
+   8. Store           ── Local SQLite WAL database; updates account balances
 ```
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Getting Started (Web / Development)
 
 ### Prerequisites
-- Node.js (v18.17.0 or later)
+- Node.js v18.17.0 or later
 - npm
 
 ### 1. Clone & Install
@@ -67,82 +110,102 @@ cd UPIPulse
 npm install
 ```
 
-### 2. Run the Development Server
+### 2. Run Development Server
 ```bash
 npm run dev
 ```
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 > [!TIP]
-> The server automatically binds to `0.0.0.0:3000`, so any device on your local Wi-Fi can access it using your computer's IP (e.g. `http://192.168.1.15:3000`).
-
----
-
-## 📱 Using as a Mobile App (PWA)
-
-You don't need to compile or sideload a risky `.apk`! UPIPulse is an installable Progressive Web App.
-
-1. **Ensure your phone and computer are on the same Wi-Fi network**.
-2. Open Chrome on your phone and enter:
-   ```text
-   http://<YOUR_COMPUTER_IP>:3000
-   ```
-   *(You can find your computer's IP by running `ipconfig` on Windows or `ifconfig` on Mac/Linux).*
-3. Tap the **3 dots menu (`⋮`)** in Chrome &rarr; tap **"Install App"** (or **"Add to Home Screen"**).
-4. Launch **UPIPulse** from your phone's home screen. It will open in full-screen standalone mode just like a native app!
+> The server binds to `0.0.0.0:3000` — any device on the same Wi-Fi can access it via your computer's IP (e.g. `http://192.168.1.15:3000`).
 
 ---
 
 ## 🤖 Automatic Ingestion (MacroDroid Setup)
 
-To automatically record your expenses when you make payments on your phone:
+For the **web version**, auto-forward SMS via MacroDroid:
 
-1. Install **MacroDroid** (Free from Google Play Store).
-2. Create a new Macro:
-   - **Trigger**: `Notification` &rarr; `Notification Received` &rarr; Select your SMS app (Google Messages) and UPI apps (Google Pay, PhonePe, Paytm, CRED).
-   - **Action**: `Connectivity` &rarr; `HTTP Request`:
-     - **Method**: `POST`
+1. Install **MacroDroid** from Google Play
+2. Create a Macro:
+   - **Trigger**: Notification Received → SMS app + UPI apps (Google Pay, PhonePe, Paytm, CRED)
+   - **Action**: HTTP Request → POST
      - **URL**: `http://<YOUR_COMPUTER_IP>:3000/api/ingest`
-     - **Headers**:
-       - `x-api-key: [Your API Key from Sync & Test tab]`
-       - `Content-Type: application/json`
-     - **Body (JSON)**:
+     - **Headers**: `x-api-key: <your key>`, `Content-Type: application/json`
+     - **Body**:
        ```json
-       {
-         "text": "[notification_text]",
-         "sender": "[package_name]"
-       }
+       { "text": "[notification_text]", "sender": "[package_name]" }
        ```
-3. Save the Macro. Whenever you pay or receive money, your dashboard updates in real time!
+3. Save — transactions now appear on the dashboard automatically!
+
+> [!NOTE]
+> The **Android APK** reads SMS natively and does not need MacroDroid.
 
 ---
 
 ## 🧪 Testing
 
-UPIPulse includes a comprehensive 54-test validation suite covering regex parsing, bank fixtures, UPI notifications, deduplication, and financial analytics integrity:
+60 tests covering parsing, deduplication, forecasting, subscription detection, and Khata logic:
 
 ```bash
 npm test
 ```
 
-To run a production build:
+Build for production web:
 ```bash
 npm run build
 ```
+
+Build Android APK:
+```bash
+npm run build:mobile      # exports static site
+cd android
+.\gradlew.bat assembleDebug
+```
+
+See [ANDROID.md](ANDROID.md) for the full Android build & signing guide.
 
 ---
 
 ## 🛡️ Tech Stack
 
-- **Framework**: [Next.js 14](https://nextjs.org/) (App Router, React 18, TypeScript)
-- **Styling**: [Tailwind CSS](https://tailwindcss.com/)
-- **Database**: [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) with WAL mode
-- **Validation**: [Zod](https://zod.dev/)
-- **Icons**: [Lucide React](https://lucide.dev/)
-- **Mobile Engine**: Progressive Web App (PWA Manifest, Apple Touch Icons, Standalone Display)
+| Layer | Technology |
+|-------|-----------|
+| Framework | [Next.js 14](https://nextjs.org/) — App Router, React 18, TypeScript |
+| Styling | [Tailwind CSS](https://tailwindcss.com/) |
+| Database | [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) with WAL mode |
+| Mobile | [Capacitor](https://capacitorjs.com/) — native Android wrapper |
+| Native SMS | Custom `SmsReaderPlugin` (Java) + `SmsReceiver` BroadcastReceiver |
+| Validation | [Zod](https://zod.dev/) |
+| Icons | [Lucide React](https://lucide.dev/) |
+| Testing | Custom Node.js test runner (60 tests) |
+
+---
+
+## 📂 Project Structure
+
+```
+UPIPulse/
+├── src/
+│   ├── app/               # Next.js pages & API routes
+│   ├── components/        # UI components (Dashboard, Transactions, Khata, etc.)
+│   └── lib/
+│       ├── parser/        # SMS parsing, deduplication, categorization
+│       ├── detector/      # Subscription detector
+│       ├── forecast/      # Cash flow predictor
+│       ├── people/        # Khata ledger
+│       └── services/      # localFinanceService, smsBridge
+├── android/               # Capacitor Android project
+│   └── app/src/main/java/com/upipulse/app/
+│       ├── MainActivity.java
+│       ├── SmsReaderPlugin.java   # Native SMS Capacitor plugin
+│       └── SmsReceiver.java       # BroadcastReceiver for live SMS
+├── tests/                 # 60-test validation suite
+├── ANDROID.md             # Android build & testing guide
+└── capacitor.config.json  # Capacitor configuration
+```
 
 ---
 
 ## 📄 License
 
-MIT License. Open source and privacy-friendly.
+MIT License — open source and privacy-friendly.
