@@ -1,8 +1,7 @@
-'use client';
-
 import React from 'react';
-import { ArrowUpRight, ArrowDownLeft, AlertCircle, Building2, ChevronRight, Zap } from 'lucide-react';
+import { ArrowUpRight, ArrowDownLeft, AlertCircle, Building2, ChevronRight, Zap, Plus, AlertTriangle, ShieldCheck, Wallet, Calendar, Users, TrendingDown, Clock } from 'lucide-react';
 import { TabType } from './BottomNav';
+import { CashFlowForecast } from '../lib/forecast/cashFlowPredictor';
 
 interface DashboardViewProps {
   analytics: any;
@@ -11,6 +10,13 @@ interface DashboardViewProps {
   needsReviewCount: number;
   onNavigate: (tab: TabType, filter?: string) => void;
   onSelectTransaction: (txn: any) => void;
+  onOpenAddExpense?: () => void;
+  onOpenManageAccounts?: () => void;
+  onOpenSubscriptions?: () => void;
+  onOpenKhata?: () => void;
+  cashFlowForecast?: CashFlowForecast | null;
+  subscriptionsCount?: number;
+  khataSummary?: { totalToReceive: number; totalToPay: number } | null;
 }
 
 export function DashboardView({
@@ -20,6 +26,13 @@ export function DashboardView({
   needsReviewCount,
   onNavigate,
   onSelectTransaction,
+  onOpenAddExpense,
+  onOpenManageAccounts,
+  onOpenSubscriptions,
+  onOpenKhata,
+  cashFlowForecast,
+  subscriptionsCount = 0,
+  khataSummary,
 }: DashboardViewProps) {
   const currentMonthName = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
 
@@ -49,13 +62,24 @@ export function DashboardView({
           </h1>
           <p className="text-xs text-zinc-400">{currentMonthName}</p>
         </div>
-        <button
-          onClick={() => onNavigate('sync')}
-          className="text-xs bg-zinc-800/80 hover:bg-zinc-700/80 border border-zinc-700/60 px-2.5 py-1.5 rounded-full text-zinc-300 flex items-center gap-1.5 transition-colors"
-        >
-          <Zap className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Sync Status</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {onOpenAddExpense && (
+            <button
+              onClick={onOpenAddExpense}
+              className="text-xs bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-zinc-950 font-bold px-3 py-1.5 rounded-full flex items-center gap-1 transition-all shadow-md shadow-emerald-500/20"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Expense</span>
+            </button>
+          )}
+          <button
+            onClick={() => onNavigate('sync')}
+            className="text-xs bg-zinc-800/80 hover:bg-zinc-700/80 border border-zinc-700/60 p-2 rounded-full text-zinc-300 flex items-center transition-colors"
+            title="Sync Status"
+          >
+            <Zap className="w-3.5 h-3.5 text-emerald-400" />
+          </button>
+        </div>
       </div>
 
       {/* Needs Review Alert Banner */}
@@ -120,6 +144,132 @@ export function DashboardView({
             Remaining: <span className="text-zinc-200 font-medium">{formatCurrency(analytics?.remainingBudget)}</span>
           </p>
         </div>
+
+        {/* Safe-to-Spend & Balance-Aware Alert */}
+        {analytics?.isBalanceConstrained ? (
+          <div className="mt-3 p-3 rounded-xl bg-amber-950/40 border border-amber-600/50 space-y-1.5 animate-in fade-in">
+            <div className="flex items-center justify-between text-xs font-bold text-amber-200">
+              <span className="flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>Safe to Spend: {formatCurrency(analytics?.safeSpendingLimit)}</span>
+              </span>
+              <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-mono">
+                Balance Constrained
+              </span>
+            </div>
+            <p className="text-[11px] text-amber-300/80 leading-relaxed">
+              Your remaining budget is {formatCurrency(analytics?.remainingBudget)}, but your total bank balance is {formatCurrency(analytics?.totalBankBalance)}. Keep spending below <strong className="text-amber-100">{formatCurrency(analytics?.safeSpendingLimit)}</strong> to avoid overdrawing your account.
+            </p>
+          </div>
+        ) : analytics?.hasAccounts ? (
+          <div className="mt-3 pt-2.5 border-t border-zinc-800/80 flex items-center justify-between text-xs">
+            <span className="flex items-center gap-1.5 text-zinc-400">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Safe to Spend (Balance Supported):</span>
+            </span>
+            <span className="text-emerald-400 font-bold font-mono">
+              {formatCurrency(analytics?.safeSpendingLimit)}
+            </span>
+          </div>
+        ) : null}
+      </div>
+
+      {/* Cash Flow Forecast Card */}
+      {cashFlowForecast && (
+        <div className="bg-zinc-900/80 border border-zinc-800 p-4 rounded-2xl space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5 uppercase tracking-wider">
+              <Clock className="w-3.5 h-3.5 text-cyan-400" />
+              Cash Flow Forecast
+            </span>
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                cashFlowForecast.status === 'CRITICAL'
+                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                  : cashFlowForecast.status === 'MODERATE'
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+              }`}
+            >
+              {cashFlowForecast.status === 'HEALTHY' ? 'Healthy Run-Rate' : cashFlowForecast.status}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 py-1 border-y border-zinc-800/60 text-center">
+            <div className="p-1.5">
+              <span className="text-[10px] text-zinc-400 block">Daily Burn</span>
+              <span className="text-sm font-bold text-white font-mono">
+                {formatCurrency(cashFlowForecast.dailyBurnRate)}
+              </span>
+            </div>
+            <div className="p-1.5 border-x border-zinc-800/60">
+              <span className="text-[10px] text-zinc-400 block">Days Left</span>
+              <span className="text-sm font-bold text-cyan-400 font-mono">
+                {cashFlowForecast.daysRemainingInMonth}d
+              </span>
+            </div>
+            <div className="p-1.5">
+              <span className="text-[10px] text-zinc-400 block">Month-End Bal</span>
+              <span
+                className={`text-sm font-bold font-mono ${
+                  cashFlowForecast.projectedMonthEndBalance < 0 ? 'text-rose-400' : 'text-emerald-400'
+                }`}
+              >
+                {formatCurrency(cashFlowForecast.projectedMonthEndBalance)}
+              </span>
+            </div>
+          </div>
+
+          <p className="text-[11px] text-zinc-400 flex items-center justify-between">
+            <span>{cashFlowForecast.statusMessage}</span>
+            <span className="text-zinc-300 font-medium font-mono">
+              Safe: {formatCurrency(cashFlowForecast.safeDailyBudget)}/d
+            </span>
+          </p>
+        </div>
+      )}
+
+      {/* Quick Action Badges: Subscriptions & Khata */}
+      <div className="grid grid-cols-2 gap-2.5">
+        {onOpenSubscriptions && (
+          <button
+            onClick={onOpenSubscriptions}
+            className="p-3 bg-zinc-900/90 border border-zinc-800/90 hover:border-indigo-500/50 rounded-xl flex items-center justify-between text-left group transition"
+          >
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-indigo-500/10 text-indigo-400 rounded-lg">
+                <Calendar className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-xs font-semibold text-white block">Subscriptions</span>
+                <span className="text-[10px] text-zinc-400">{subscriptionsCount} active detected</span>
+              </div>
+            </div>
+            <ChevronRight className="w-3.5 h-3.5 text-zinc-500 group-hover:text-indigo-400 transition" />
+          </button>
+        )}
+
+        {onOpenKhata && (
+          <button
+            onClick={onOpenKhata}
+            className="p-3 bg-zinc-900/90 border border-zinc-800/90 hover:border-purple-500/50 rounded-xl flex items-center justify-between text-left group transition"
+          >
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-purple-500/10 text-purple-400 rounded-lg">
+                <Users className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-xs font-semibold text-white block">Khata / Split</span>
+                <span className="text-[10px] text-zinc-400">
+                  {khataSummary && khataSummary.totalToReceive > 0
+                    ? `+₹${khataSummary.totalToReceive.toLocaleString('en-IN')}`
+                    : 'Track debts'}
+                </span>
+              </div>
+            </div>
+            <ChevronRight className="w-3.5 h-3.5 text-zinc-500 group-hover:text-purple-400 transition" />
+          </button>
+        )}
       </div>
 
       {/* Last Reported Account Balances */}
@@ -128,7 +278,15 @@ export function DashboardView({
           <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
             Last Reported Balances
           </h2>
-          <span className="text-[11px] text-zinc-400 italic">Updated from bank SMS</span>
+          {onOpenManageAccounts && (
+            <button
+              onClick={onOpenManageAccounts}
+              className="text-[11px] text-emerald-400 hover:text-emerald-300 font-medium flex items-center gap-1 transition-colors"
+            >
+              <Wallet className="w-3 h-3" />
+              <span>Manage / Edit Balance</span>
+            </button>
+          )}
         </div>
 
         {accounts.length === 0 ? (
@@ -136,8 +294,17 @@ export function DashboardView({
             <Building2 className="w-6 h-6 text-zinc-600 mx-auto mb-1.5" />
             <p className="text-xs text-zinc-400">No bank accounts detected yet.</p>
             <p className="text-[11px] text-zinc-400 mt-0.5">
-              Paste or sync a bank SMS containing an available balance to display it here.
+              Paste or sync a bank SMS, or enter your starting balance manually.
             </p>
+            {onOpenManageAccounts && (
+              <button
+                onClick={onOpenManageAccounts}
+                className="mt-2.5 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Set Starting Bank Balance</span>
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">

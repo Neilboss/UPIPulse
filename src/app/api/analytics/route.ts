@@ -94,10 +94,27 @@ export async function GET() {
       LIMIT 5
     `).all() as { merchant: string; category: string; total: number; count: number }[];
 
+    // 7. Total Bank Balance & Safe Spending Calculation
+    const totalBalanceRow = db.prepare(`
+      SELECT COALESCE(SUM(balance), 0) as totalBalance, COUNT(*) as accountCount
+      FROM accounts
+      WHERE balance IS NOT NULL
+    `).get() as { totalBalance: number; accountCount: number };
+
+    const totalBankBalance = totalBalanceRow.totalBalance;
+    const hasAccounts = totalBalanceRow.accountCount > 0;
+    const remainingBudget = Math.max(0, monthlyBudget - currentMonthSpend);
+    const safeSpendingLimit = hasAccounts ? Math.min(remainingBudget, totalBankBalance) : remainingBudget;
+    const isBalanceConstrained = hasAccounts && totalBankBalance < remainingBudget;
+
     return NextResponse.json({
       currentMonthSpend,
       monthlyBudget,
-      remainingBudget: Math.max(0, monthlyBudget - currentMonthSpend),
+      remainingBudget,
+      totalBankBalance,
+      safeSpendingLimit,
+      isBalanceConstrained,
+      hasAccounts,
       budgetUsedPercent: Math.min(100, Math.round((currentMonthSpend / monthlyBudget) * 100)),
       dailyAverageSpend,
       categoryBreakdown,

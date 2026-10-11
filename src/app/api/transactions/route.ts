@@ -87,13 +87,35 @@ export async function POST(req: NextRequest) {
     const txnCategory = category || 'Other';
     const fingerprint = generateFingerprint(amount, txnType, accountId || null, txnMerchant);
 
+    // Sync account balance if accountId is provided and account exists
+    let updatedBalance: number | null = null;
+    if (accountId) {
+      const acc = db.prepare('SELECT balance FROM accounts WHERE id = ?').get(accountId) as { balance: number | null } | undefined;
+      if (acc && acc.balance !== null && acc.balance !== undefined) {
+        if (txnType === 'DEBIT') {
+          updatedBalance = Math.max(0, acc.balance - amount);
+        } else if (txnType === 'CREDIT' || txnType === 'REFUND') {
+          updatedBalance = acc.balance + amount;
+        }
+        if (updatedBalance !== null) {
+          db.prepare(`
+            UPDATE accounts SET
+              balance = ?,
+              balance_updated_at = ?,
+              updated_at = ?
+            WHERE id = ?
+          `).run(updatedBalance, now, now, accountId);
+        }
+      }
+    }
+
     db.prepare(`
       INSERT INTO transactions (
         id, amount, type, merchant, category, account_id, balance_after,
         ref_id, source, parser_status, parser_confidence, raw_text,
         transaction_at, ingested_at, fingerprint, is_internal_transfer,
         is_deleted, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, 'Manual', 'PARSED', 1.0, ?, ?, ?, ?, 0, 0, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 'Manual', 'PARSED', 1.0, ?, ?, ?, ?, 0, 0, ?, ?)
     `).run(
       id,
       amount,
@@ -101,6 +123,7 @@ export async function POST(req: NextRequest) {
       txnMerchant,
       txnCategory,
       accountId || null,
+      updatedBalance,
       `Manual entry: ${txnMerchant} - ₹${amount}`,
       transactionAt || now,
       now,
@@ -109,7 +132,7 @@ export async function POST(req: NextRequest) {
       now
     );
 
-    return NextResponse.json({ success: true, transactionId: id });
+    return NextResponse.json({ success: true, transactionId: id, newBalance: updatedBalance });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }

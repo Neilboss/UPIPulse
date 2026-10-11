@@ -67,8 +67,15 @@ function initSchema(db: Database.Database) {
     const initialApiKey = 'upi_' + crypto.randomBytes(16).toString('hex');
     const now = new Date().toISOString();
     db.prepare(`
-      INSERT INTO settings (id, api_key, monthly_budget_total, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO settings (id, api_key, monthly_budget_total, is_onboarded, created_at, updated_at)
+      VALUES (?, ?, ?, 0, ?, ?)
     `).run('settings_default', initialApiKey, 35000, now, now);
+  } else {
+    // Migration check: ensure is_onboarded column exists
+    const columns = db.prepare("PRAGMA table_info(settings)").all() as { name: string }[];
+    const hasOnboarded = columns.some((col) => col.name === 'is_onboarded');
+    if (!hasOnboarded) {
+      db.prepare('ALTER TABLE settings ADD COLUMN is_onboarded INTEGER NOT NULL DEFAULT 0').run();
+    }
   }
 }

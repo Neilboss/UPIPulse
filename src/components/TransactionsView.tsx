@@ -1,13 +1,13 @@
-'use client';
-
 import React, { useState } from 'react';
-import { Search, Filter, AlertCircle, ArrowUpRight, ArrowDownLeft, X, Trash2, Check, FileText } from 'lucide-react';
+import { Search, Filter, AlertCircle, ArrowUpRight, ArrowDownLeft, X, Trash2, Check, FileText, Plus, Users } from 'lucide-react';
 
 interface TransactionsViewProps {
   transactions: any[];
   needsReviewCount: number;
   initialFilter?: string;
   onRefresh: () => void;
+  onOpenAddExpense?: () => void;
+  onSplitToKhata?: (txn: any) => void;
 }
 
 export function TransactionsView({
@@ -15,6 +15,8 @@ export function TransactionsView({
   needsReviewCount,
   initialFilter,
   onRefresh,
+  onOpenAddExpense,
+  onSplitToKhata,
 }: TransactionsViewProps) {
   const [search, setSearch] = useState('');
   const [selectedType, setSelectedType] = useState<string>(initialFilter === 'needsReview' ? 'needsReview' : 'All');
@@ -127,7 +129,18 @@ export function TransactionsView({
     <div className="space-y-3 pb-6">
       {/* Header & Search */}
       <div className="pt-1">
-        <h1 className="text-xl font-bold tracking-tight text-white mb-2">Transactions</h1>
+        <div className="flex items-center justify-between mb-2">
+          <h1 className="text-xl font-bold tracking-tight text-white">Transactions</h1>
+          {onOpenAddExpense && (
+            <button
+              onClick={onOpenAddExpense}
+              className="text-xs bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-zinc-950 font-bold px-3 py-1.5 rounded-full flex items-center gap-1 transition-all shadow-md shadow-emerald-500/20"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Expense</span>
+            </button>
+          )}
+        </div>
         <div className="relative">
           <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-3" />
           <input
@@ -431,6 +444,21 @@ export function TransactionsView({
               >
                 <Trash2 className="w-4 h-4" />
               </button>
+              {onSplitToKhata && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const txn = activeModalTxn;
+                    setActiveModalTxn(null);
+                    onSplitToKhata(txn);
+                  }}
+                  className="px-3 py-2 bg-purple-950/40 hover:bg-purple-900/40 border border-purple-700/60 text-purple-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                  title="Split into Khata"
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span>Split</span>
+                </button>
+              )}
               <button
                 type="button"
                 disabled={isSaving}

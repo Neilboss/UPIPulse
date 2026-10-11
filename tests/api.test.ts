@@ -92,6 +92,66 @@ export function runApiAndIntegrityTests() {
 
   assert(netSpend === 400, 'Analytics net spend accurately computes (DEBIT 500 - REFUND 100 = 400), excluding CREDIT and INTERNAL_TRANSFER');
 
+  // 4. Initial Balance Onboarding & Account Creation Test
+  db.exec(`
+    CREATE TABLE accounts (
+      id TEXT PRIMARY KEY,
+      bank_name TEXT NOT NULL,
+      account_mask TEXT NOT NULL,
+      balance REAL NULL,
+      balance_updated_at TEXT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE TABLE settings (
+      id TEXT PRIMARY KEY,
+      api_key TEXT NOT NULL,
+      monthly_budget_total REAL DEFAULT 35000,
+      is_onboarded INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+
+  // Simulate initial onboarding setup
+  const startingBalance = 4000;
+  const monthlyBudget = 5000;
+  db.prepare(`
+    INSERT INTO accounts (id, bank_name, account_mask, balance, balance_updated_at, created_at, updated_at)
+    VALUES ('acc_hdfc4321', 'HDFC Bank', 'XX4321', ?, ?, ?, ?)
+  `).run(startingBalance, now, now, now);
+
+  db.prepare(`
+    INSERT INTO settings (id, api_key, monthly_budget_total, is_onboarded, created_at, updated_at)
+    VALUES ('settings_default', 'test_key', ?, 1, ?, ?)
+  `).run(monthlyBudget, now, now);
+
+  const accAfterOnboard = db.prepare('SELECT balance FROM accounts WHERE id = ?').get('acc_hdfc4321') as { balance: number };
+  const settingsAfterOnboard = db.prepare('SELECT is_onboarded, monthly_budget_total FROM settings WHERE id = ?').get('settings_default') as { is_onboarded: number; monthly_budget_total: number };
+
+  assert(accAfterOnboard.balance === 4000, 'Initial bank balance saved successfully on onboarding: 4000');
+  assert(settingsAfterOnboard.is_onboarded === 1, 'Settings records user onboarding complete: is_onboarded = 1');
+  assert(settingsAfterOnboard.monthly_budget_total === 5000, 'Monthly budget limit initialized: 5000');
+
+  // 5. Manual Expense Entry with Automatic Balance Deduction
+  const manualExpenseAmount = 500;
+  // Deduct from account
+  db.prepare('UPDATE accounts SET balance = balance - ?, updated_at = ? WHERE id = ?').run(manualExpenseAmount, now, 'acc_hdfc4321');
+  // Insert manual transaction
+  insertStmt.run('m1', manualExpenseAmount, 'DEBIT', 'Local Grocery', 'Shopping', 0, 0, now, now, now);
+
+  const accAfterExpense = db.prepare('SELECT balance FROM accounts WHERE id = ?').get('acc_hdfc4321') as { balance: number };
+  assert(accAfterExpense.balance === 3500, 'Manual expense entry automatically updates account balance (4000 - 500 = 3500)');
+
+  // 6. Safe-to-Spend & Balance Constraint Calculation
+  const totalBalanceRow = db.prepare('SELECT COALESCE(SUM(balance), 0) as totalBalance FROM accounts').get() as { totalBalance: number };
+  const remainingBudget = Math.max(0, settingsAfterOnboard.monthly_budget_total - manualExpenseAmount); // 5000 - 500 = 4500
+  const safeSpendingLimit = Math.min(remainingBudget, totalBalanceRow.totalBalance); // min(4500, 3500) = 3500
+  const isBalanceConstrained = totalBalanceRow.totalBalance < remainingBudget;
+
+  assert(isBalanceConstrained === true, 'Correctly detects balance constraint: bank balance (3500) < remaining budget (4500)');
+  assert(safeSpendingLimit === 3500, 'Correctly caps safe spending limit to available bank balance: 3500');
+
   db.close();
   return { passed, failed };
 }

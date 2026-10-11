@@ -35,3 +35,17 @@ npm-debug.log*
 
 # Test coverage
 coverage/
+
+# Android build artifacts
+android/app/build/
+android/.gradle/
+android/build/
+android/app/release/
+
+# Keystore / signing secrets (never commit!)
+android/app/android.keystore
+*.keystore
+*.jks
+
+# Capacitor temp folder used during mobile build
+.api_temp/

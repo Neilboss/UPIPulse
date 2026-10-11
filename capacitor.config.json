@@ -1,0 +1,9 @@
+{
+  "appId": "com.upipulse.app",
+  "appName": "UPIPulse",
+  "webDir": "out",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": true
+  }
+}

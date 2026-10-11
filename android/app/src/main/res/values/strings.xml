@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">UPIPulse</string>
+    <string name="title_activity_main">UPIPulse</string>
+    <string name="package_name">com.upipulse.app</string>
+    <string name="custom_url_scheme">com.upipulse.app</string>
+</resources>

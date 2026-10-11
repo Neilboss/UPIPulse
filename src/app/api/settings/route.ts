@@ -28,7 +28,8 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       monthlyBudgetTotal: settings?.monthly_budget_total || 35000,
-      apiKey: revealKey ? settings?.api_key : `${settings?.api_key.substring(0, 7)}••••••••••••••••`,
+      isOnboarded: !!settings?.is_onboarded,
+      apiKey: revealKey ? settings?.api_key : `${settings?.api_key?.substring(0, 7)}••••••••••••••••`,
       webhookUrl,
       localIp,
     });
@@ -53,13 +54,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, newApiKey: newKey, message: 'API Key rotated successfully' });
     }
 
+    let updated = false;
+
     if (body.monthlyBudgetTotal && typeof body.monthlyBudgetTotal === 'number' && body.monthlyBudgetTotal > 0) {
       db.prepare(`
         UPDATE settings SET monthly_budget_total = ?, updated_at = ?
         WHERE id = 'settings_default'
       `).run(body.monthlyBudgetTotal, now);
+      updated = true;
+    }
 
-      return NextResponse.json({ success: true, message: 'Budget updated successfully' });
+    if (body.isOnboarded !== undefined) {
+      db.prepare(`
+        UPDATE settings SET is_onboarded = ?, updated_at = ?
+        WHERE id = 'settings_default'
+      `).run(body.isOnboarded ? 1 : 0, now);
+      updated = true;
+    }
+
+    if (updated) {
+      return NextResponse.json({ success: true, message: 'Settings updated successfully' });
     }
 
     return NextResponse.json({ error: 'Invalid settings update' }, { status: 400 });

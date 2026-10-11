@@ -8,9 +8,12 @@
     "dev:local": "next dev",
     "build": "next build",
     "start": "next start -H 0.0.0.0",
-    "test": "tsx tests/runAllTests.ts"
+    "test": "tsx tests/runAllTests.ts",
+    "build:mobile": "powershell -Command \"Move-Item src/app/api ./.api_temp -Force; try { $env:CAPACITOR_BUILD='true'; npm run build } finally { Move-Item ./.api_temp src/app/api -Force }\""
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/core": "^8.5.3",
     "better-sqlite3": "^13.0.3",
     "clsx": "^2.1.1",
     "lucide-react": "^1.48.0",
@@ -21,6 +24,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.6.3",
     "@types/react": "^18.3.11",

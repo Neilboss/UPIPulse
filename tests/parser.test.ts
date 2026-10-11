@@ -25,11 +25,11 @@ export function runParserTests() {
 
   const otpMsg = 'Dear Customer, 482910 is your secret OTP for login to netbanking. Do not share OTP with anyone.';
   const otpRes = preFilterMessage(otpMsg);
-  assert(!otpRes.isFinancial && otpRes.rejectReason?.includes('OTP'), 'Pre-filter safely rejects non-transactional OTP messages');
+  assert(!otpRes.isFinancial && Boolean(otpRes.rejectReason?.includes('OTP')), 'Pre-filter safely rejects non-transactional OTP messages');
 
   const promoMsg = 'Congratulations! You are eligible for a Pre-approved Personal Loan of Rs. 5,00,000. Apply now!';
   const promoRes = preFilterMessage(promoMsg);
-  assert(!promoRes.isFinancial && promoRes.rejectReason?.includes('offer'), 'Pre-filter safely rejects promotional loan spam');
+  assert(!promoRes.isFinancial && Boolean(promoRes.rejectReason?.includes('offer')), 'Pre-filter safely rejects promotional loan spam');
 
   console.log('\n--- 2. BANK SMS FIXTURE TESTS ---');
 
