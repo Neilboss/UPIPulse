@@ -244,11 +244,35 @@ export class LocalFinanceService {
 
   public static updateTransaction(
     id: string,
-    updates: Partial<Pick<LocalTransaction, 'merchant' | 'category' | 'type' | 'amount' | 'is_internal_transfer'>>
+    updates: Partial<Pick<LocalTransaction, 'merchant' | 'category' | 'type' | 'amount' | 'is_internal_transfer'>>,
+    fallbackTxn?: any
   ): boolean {
     const txns = this.getAllTransactionsRaw();
     const idx = txns.findIndex((t) => t.id === id && !t.is_deleted);
-    if (idx === -1) return false;
+    if (idx === -1) {
+      if (fallbackTxn) {
+        txns.unshift({
+          ...fallbackTxn,
+          merchant: updates.merchant !== undefined ? updates.merchant : fallbackTxn.merchant,
+          category: updates.category !== undefined ? updates.category : fallbackTxn.category,
+          type: updates.type !== undefined ? updates.type : fallbackTxn.type,
+          amount: updates.amount !== undefined ? updates.amount : fallbackTxn.amount,
+          is_internal_transfer:
+            updates.is_internal_transfer !== undefined
+              ? updates.is_internal_transfer
+              : updates.type === 'INTERNAL_TRANSFER'
+              ? 1
+              : fallbackTxn.is_internal_transfer || 0,
+          parser_status: 'PARSED',
+          parser_confidence: 1.0,
+          is_deleted: 0,
+          updated_at: new Date().toISOString(),
+        });
+        this.setItem(this.TXN_KEY, JSON.stringify(txns));
+        return true;
+      }
+      return false;
+    }
 
     const current = txns[idx];
     txns[idx] = {
@@ -264,6 +288,7 @@ export class LocalFinanceService {
           ? 1
           : current.is_internal_transfer,
       parser_status: 'PARSED',
+      parser_confidence: 1.0,
       updated_at: new Date().toISOString(),
     };
     this.setItem(this.TXN_KEY, JSON.stringify(txns));

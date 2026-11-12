@@ -93,8 +93,8 @@ export function LoginModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="bg-zinc-900 border border-zinc-700/80 rounded-2xl w-full max-w-sm p-5 space-y-4 shadow-2xl relative">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 pb-10 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="bg-zinc-900 border border-zinc-700/80 rounded-2xl w-full max-w-sm p-5 space-y-4 shadow-2xl relative max-h-[85vh] overflow-y-auto">
         {/* Close Button if not mandatory */}
         {!isMandatory && onClose && (
           <button

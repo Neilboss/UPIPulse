@@ -49,24 +49,30 @@ export function TransactionsView({
     setShowRawMsg(false);
   };
 
-  const handleSaveModal = async () => {
+  const handleSaveModal = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!activeModalTxn) return;
     setIsSaving(true);
     try {
-      LocalFinanceService.updateTransaction(activeModalTxn.id, {
-        merchant: editMerchant,
-        category: editCategory,
-        type: editType,
-        amount: editAmount,
-        is_internal_transfer: editInternal,
-      });
+      const cleanedMerchant = editMerchant.trim() || 'Unknown Merchant';
+      LocalFinanceService.updateTransaction(
+        activeModalTxn.id,
+        {
+          merchant: cleanedMerchant,
+          category: editCategory,
+          type: editType,
+          amount: editAmount,
+          is_internal_transfer: editInternal,
+        },
+        activeModalTxn
+      );
 
       try {
         await fetch(`/api/transactions/${activeModalTxn.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            merchant: editMerchant,
+            merchant: cleanedMerchant,
             category: editCategory,
             type: editType,
             amount: editAmount,
@@ -79,8 +85,8 @@ export function TransactionsView({
 
       setActiveModalTxn(null);
       onRefresh();
-    } catch (e) {
-      console.error(e);
+    } catch (err) {
+      console.error(err);
     } finally {
       setIsSaving(false);
     }
@@ -332,40 +338,61 @@ export function TransactionsView({
 
       {/* Edit / Details Modal */}
       {activeModalTxn && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-3">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-sm p-4 space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b border-zinc-800 pb-2.5">
+        <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 pb-10 sm:p-4">
+          <div className="bg-zinc-900 border border-zinc-700/80 rounded-2xl w-full max-w-sm shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+            {/* Sticky Top Header with Quick OK / Save Button */}
+            <div className="shrink-0 flex justify-between items-center px-4 py-3 border-b border-zinc-800 bg-zinc-900">
               <h2 className="text-sm font-bold text-white">Transaction Details</h2>
-              <button
-                onClick={() => setActiveModalTxn(null)}
-                className="text-zinc-400 hover:text-white p-1 rounded-md"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={isSaving}
+                  onClick={() => handleSaveModal()}
+                  className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 active:scale-95 disabled:opacity-50 text-zinc-950 font-bold rounded-lg text-xs flex items-center gap-1 transition-all shadow-md shadow-emerald-500/20"
+                >
+                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>{isSaving ? 'Saving...' : 'OK'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveModalTxn(null)}
+                  className="text-zinc-400 hover:text-white bg-zinc-800/80 hover:bg-zinc-700 p-1.5 rounded-lg transition-colors"
+                  title="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
-            {/* Status Alert if Needs Review */}
-            {activeModalTxn.parser_status === 'NEEDS_REVIEW' && (
-              <div className="bg-amber-950/40 border border-amber-700/50 p-2.5 rounded-lg flex items-start gap-2 text-xs text-amber-200">
-                <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-bold">Confidence: {Math.round(activeModalTxn.parser_confidence * 100)}%</span>
-                  <p className="text-[11px] text-amber-400/90 mt-0.5">
-                    Please verify or edit the merchant name and category below.
-                  </p>
+            {/* Scrollable Body */}
+            <form
+              onSubmit={handleSaveModal}
+              className="flex-1 overflow-y-auto p-4 space-y-3 text-xs"
+            >
+              {/* Status Alert if Needs Review */}
+              {activeModalTxn.parser_status === 'NEEDS_REVIEW' && (
+                <div className="bg-amber-950/40 border border-amber-700/50 p-2.5 rounded-lg flex items-start gap-2 text-xs text-amber-200">
+                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold">Confidence: {Math.round(activeModalTxn.parser_confidence * 100)}%</span>
+                    <p className="text-[11px] text-amber-400/90 mt-0.5">
+                      Please verify or edit the merchant name and category below, then tap OK.
+                    </p>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Editable Fields */}
-            <div className="space-y-3 text-xs">
+              {/* Editable Fields */}
               <div>
                 <label className="text-[11px] text-zinc-400 block mb-1">Merchant / Payee</label>
                 <input
                   type="text"
+                  enterKeyHint="done"
                   value={editMerchant}
+                  onFocus={(e) => e.target.select()}
                   onChange={(e) => setEditMerchant(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-zinc-100 font-medium focus:border-emerald-500 focus:outline-none"
+                  placeholder="Enter merchant or payee name"
+                  className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-zinc-100 font-medium focus:border-emerald-500 focus:outline-none"
                 />
               </div>
 
@@ -375,7 +402,7 @@ export function TransactionsView({
                   <select
                     value={editCategory}
                     onChange={(e) => setEditCategory(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                    className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-zinc-100 focus:border-emerald-500 focus:outline-none"
                   >
                     {categories.filter((c) => c !== 'All').map((c) => (
                       <option key={c} value={c}>
@@ -390,7 +417,7 @@ export function TransactionsView({
                   <select
                     value={editType}
                     onChange={(e) => setEditType(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                    className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-zinc-100 focus:border-emerald-500 focus:outline-none"
                   >
                     <option value="DEBIT">DEBIT (Expense)</option>
                     <option value="CREDIT">CREDIT (Income)</option>
@@ -405,10 +432,47 @@ export function TransactionsView({
                 <input
                   type="number"
                   step="0.01"
+                  enterKeyHint="done"
                   value={editAmount}
+                  onFocus={(e) => e.target.select()}
                   onChange={(e) => setEditAmount(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2 text-zinc-100 font-mono font-bold focus:border-emerald-500 focus:outline-none"
+                  className="w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2.5 text-zinc-100 font-mono font-bold focus:border-emerald-500 focus:outline-none"
                 />
+              </div>
+
+              {/* Primary Accessible Action Bar Directly Below Inputs */}
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleDeleteModal}
+                  className="p-2.5 text-rose-400 hover:bg-rose-950/40 border border-rose-900/60 rounded-xl transition-colors"
+                  title="Delete Transaction"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+                {onSplitToKhata && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const txn = activeModalTxn;
+                      setActiveModalTxn(null);
+                      onSplitToKhata(txn);
+                    }}
+                    className="px-3 py-2.5 bg-purple-950/40 hover:bg-purple-900/40 border border-purple-700/60 text-purple-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                    title="Split into Khata"
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    <span>Split</span>
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="flex-1 bg-emerald-500 hover:bg-emerald-600 active:scale-[0.98] disabled:opacity-50 text-zinc-950 font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-emerald-500/20"
+                >
+                  <Check className="w-4 h-4 stroke-[2.5]" />
+                  <span>{isSaving ? 'Saving...' : 'OK • Save Details'}</span>
+                </button>
               </div>
 
               {/* Read-only audit details */}
@@ -455,43 +519,7 @@ export function TransactionsView({
                   </div>
                 )}
               </div>
-            </div>
-
-            {/* Modal Actions */}
-            <div className="flex gap-2 pt-2 border-t border-zinc-800">
-              <button
-                type="button"
-                onClick={handleDeleteModal}
-                className="p-2 text-rose-400 hover:bg-rose-950/40 border border-rose-900/60 rounded-lg transition-colors"
-                title="Delete Transaction"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-              {onSplitToKhata && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const txn = activeModalTxn;
-                    setActiveModalTxn(null);
-                    onSplitToKhata(txn);
-                  }}
-                  className="px-3 py-2 bg-purple-950/40 hover:bg-purple-900/40 border border-purple-700/60 text-purple-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
-                  title="Split into Khata"
-                >
-                  <Users className="w-3.5 h-3.5" />
-                  <span>Split</span>
-                </button>
-              )}
-              <button
-                type="button"
-                disabled={isSaving}
-                onClick={handleSaveModal}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-medium py-2 rounded-lg text-xs flex items-center justify-center gap-1.5 transition-colors"
-              >
-                <Check className="w-4 h-4" />
-                <span>{isSaving ? 'Saving...' : 'Save Changes'}</span>
-              </button>
-            </div>
+            </form>
           </div>
         </div>
       )}

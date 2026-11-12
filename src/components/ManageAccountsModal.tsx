@@ -89,7 +89,7 @@ export function ManageAccountsModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 pb-10 sm:p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl relative max-h-[85vh] overflow-y-auto">
         <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
           <div className="flex items-center gap-2">

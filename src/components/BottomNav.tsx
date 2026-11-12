@@ -26,7 +26,7 @@ export function BottomNav({ currentTab, onTabChange, needsReviewCount = 0 }: Bot
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-zinc-950/95 backdrop-blur-md border-t border-zinc-800">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-zinc-950/95 backdrop-blur-md border-t border-zinc-800 pb-[env(safe-area-inset-bottom,0px)]">
       <div className="max-w-md mx-auto flex items-center justify-around py-2 px-3">
         {tabs.map((tab) => {
           const Icon = tab.icon;

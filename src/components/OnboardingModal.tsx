@@ -89,8 +89,8 @@ export function OnboardingModal({ isOpen, onComplete }: OnboardingModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-zinc-900 border border-zinc-700/80 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl relative">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 pb-10 sm:p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-zinc-900 border border-zinc-700/80 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl relative max-h-[85vh] overflow-y-auto">
         {/* Header */}
         <div className="text-center space-y-1">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 mb-1">
