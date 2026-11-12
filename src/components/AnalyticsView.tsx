@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Download, PieChart, TrendingUp, Store } from 'lucide-react';
+import { LocalFinanceService } from '../lib/services/localFinanceService';
 
 interface AnalyticsViewProps {
   analytics: any;
@@ -14,7 +15,18 @@ export function AnalyticsView({ analytics }: AnalyticsViewProps) {
   };
 
   const handleExport = (format: 'csv' | 'json') => {
-    window.location.href = `/api/export?format=${format}`;
+    const content =
+      format === 'csv'
+        ? LocalFinanceService.exportDataCsv()
+        : LocalFinanceService.exportDataJson();
+    const mime = format === 'csv' ? 'text/csv;charset=utf-8;' : 'application/json';
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `upipulse_export_${new Date().toISOString().slice(0, 10)}.${format}`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const currentSpend = analytics?.currentMonthSpend || 0;

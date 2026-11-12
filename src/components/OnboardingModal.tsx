@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Building2, Wallet, Target, Sparkles, Check, ArrowRight } from 'lucide-react';
+import { LocalFinanceService } from '../lib/services/localFinanceService';
 
 interface OnboardingModalProps {
   isOpen: boolean;
@@ -43,26 +44,41 @@ export function OnboardingModal({ isOpen, onComplete }: OnboardingModalProps) {
     const cleanMask = accountMask.trim() ? (accountMask.startsWith('XX') ? accountMask : `XX${accountMask}`) : 'XX1234';
 
     try {
-      // 1. Create initial bank account
-      await fetch('/api/accounts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          bankName: chosenBank,
-          accountMask: cleanMask,
-          balance: numBalance,
-        }),
+      // Save to on-device local store first (guaranteed to work offline / on Android APK)
+      LocalFinanceService.saveAccount({
+        bank_name: chosenBank,
+        account_mask: cleanMask,
+        balance: numBalance,
+        balance_updated_at: new Date().toISOString(),
+      });
+      LocalFinanceService.updateSettings({
+        monthly_budget_total: numBudget,
+        is_onboarded: true,
       });
 
-      // 2. Set monthly budget and mark onboarded
-      await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          monthlyBudgetTotal: numBudget,
-          isOnboarded: true,
-        }),
-      });
+      // Also sync to server API when available
+      try {
+        await fetch('/api/accounts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            bankName: chosenBank,
+            accountMask: cleanMask,
+            balance: numBalance,
+          }),
+        });
+
+        await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            monthlyBudgetTotal: numBudget,
+            isOnboarded: true,
+          }),
+        });
+      } catch {
+        // Offline / native Android mode
+      }
 
       onComplete();
     } catch (err: any) {

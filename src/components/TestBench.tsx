@@ -1,6 +1,10 @@
+'use client';
+
 import React, { useState } from 'react';
 import { Play, Check, AlertCircle, Sparkles, Save, Copy, RotateCcw, Zap, CheckCircle2 } from 'lucide-react';
 import { LocalFinanceService } from '../lib/services/localFinanceService';
+import { parseTransactionMessage } from '../lib/parser/smsParser';
+import { categorizeTransaction } from '../lib/parser/categorizer';
 
 interface TestBenchProps {
   apiKey?: string;
@@ -91,12 +95,43 @@ export function TestBench({ apiKey, onTransactionSaved }: TestBenchProps) {
     setSaveMessage(null);
 
     try {
-      const res = await fetch('/api/parse', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: inputText }),
-      });
-      const data = await res.json();
+      // Try server API first, fallback to on-device parser for Android APK / offline
+      let data: any = null;
+      try {
+        const res = await fetch('/api/parse', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: inputText }),
+        });
+        if (res.ok) {
+          data = await res.json();
+        }
+      } catch {
+        // Offline / native Android mode
+      }
+
+      if (!data) {
+        const parsed = parseTransactionMessage(inputText);
+        const predictedCategory = categorizeTransaction(parsed.merchant, parsed.normalizedText);
+        const existingTxns = LocalFinanceService.getTransactions();
+        const isDupe = existingTxns.some(
+          (t) =>
+            t.raw_text.trim() === inputText.trim() ||
+            (parsed.refId && parsed.refId.length >= 6 && t.ref_id === parsed.refId)
+        );
+        data = {
+          success: true,
+          parsed: {
+            ...parsed,
+            predictedCategory,
+          },
+          duplicateCheck: {
+            isDuplicate: isDupe,
+            reason: isDupe ? 'Matches existing transaction in local store' : undefined,
+          },
+        };
+      }
+
       setParseResult(data);
     } catch (e: any) {
       console.error(e);
@@ -107,34 +142,43 @@ export function TestBench({ apiKey, onTransactionSaved }: TestBenchProps) {
   };
 
   const handleSaveToTransactions = async () => {
-    if (!inputText.trim() || !apiKey) return;
+    if (!inputText.trim()) return;
     setIsSaving(true);
     setSaveMessage(null);
 
     try {
-      const res = await fetch('/api/ingest', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-        },
-        body: JSON.stringify({ text: inputText, sender: 'Test Bench' }),
-      });
-      const data = await res.json();
+      const localRes = LocalFinanceService.ingestMessage(inputText, 'Test Bench');
 
-      if (data.success) {
+      if (apiKey) {
+        try {
+          await fetch('/api/ingest', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': apiKey,
+            },
+            body: JSON.stringify({ text: inputText, sender: 'Test Bench' }),
+          });
+        } catch {
+          // Offline / native Android mode
+        }
+      }
+
+      if (localRes.success) {
         setSaveMessage(
-          data.duplicate
-            ? (data.fused ? '✓ Fused with existing transaction successfully!' : '✓ Already imported (duplicate detected)')
-            : '✓ Transaction saved to database successfully!'
+          localRes.action === 'FUSED'
+            ? '✓ Fused with existing transaction successfully!'
+            : '✓ Transaction saved to ledger successfully!'
         );
         if (onTransactionSaved) onTransactionSaved();
+      } else if (localRes.action === 'DUPLICATE') {
+        setSaveMessage('✓ Already imported (duplicate detected)');
       } else {
-        setSaveMessage('✗ Could not save: ' + (data.error || 'Unsupported'));
+        setSaveMessage('✗ Could not save: ' + (localRes.reason || 'Unsupported'));
       }
     } catch (e: any) {
       console.error(e);
-      setSaveMessage('✗ Network error saving transaction');
+      setSaveMessage('✗ Error saving transaction');
     } finally {
       setIsSaving(false);
     }
@@ -148,10 +192,12 @@ export function TestBench({ apiKey, onTransactionSaved }: TestBenchProps) {
     setBatchStats(null);
 
     try {
+      // Spread messages over the last 6 days (within current month & 14-day window)
+      const now = Date.now();
       const messages = HARDCORE_BATCH_MESSAGES.map((body, i) => ({
         body,
         address: 'BANK-SMS',
-        date: Date.now() - (HARDCORE_BATCH_MESSAGES.length - i) * 86400000,
+        date: now - (HARDCORE_BATCH_MESSAGES.length - 1 - i) * 5 * 3600 * 1000,
       }));
 
       const res = LocalFinanceService.ingestHistoricalBatch(messages);

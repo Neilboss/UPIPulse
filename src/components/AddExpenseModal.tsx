@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, PlusCircle, ArrowDownLeft, ArrowUpRight, RefreshCw, Check, Tag, Building2, Calendar } from 'lucide-react';
+import { LocalFinanceService } from '../lib/services/localFinanceService';
 
 interface AddExpenseModalProps {
   isOpen: boolean;
@@ -28,6 +29,12 @@ export function AddExpenseModal({
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen && !selectedAccountId && accounts.length > 0) {
+      setSelectedAccountId(accounts[0].id);
+    }
+  }, [isOpen, accounts, selectedAccountId]);
 
   if (!isOpen) return null;
 
@@ -59,24 +66,42 @@ export function AddExpenseModal({
     setError(null);
 
     try {
-      const res = await fetch('/api/transactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: numAmount,
-          type,
-          merchant: merchant.trim(),
-          category,
-          accountId: selectedAccountId || null,
-          transactionAt: new Date(transactionAt).toISOString(),
-        }),
-      });
+      const isoTime = new Date(transactionAt).toISOString();
+      let serverTxnId: string | undefined;
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to save transaction');
+      try {
+        const res = await fetch('/api/transactions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: numAmount,
+            type,
+            merchant: merchant.trim(),
+            category,
+            accountId: selectedAccountId || null,
+            transactionAt: isoTime,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          serverTxnId = data.transactionId;
+        }
+      } catch {
+        // Offline / native Android mode
       }
 
+      LocalFinanceService.addManualTransaction({
+        id: serverTxnId,
+        amount: numAmount,
+        type,
+        merchant: merchant.trim(),
+        category,
+        accountId: selectedAccountId || null,
+        transactionAt: isoTime,
+      });
+
+      setAmount('');
+      setMerchant('');
       onSuccess();
       onClose();
     } catch (err: any) {

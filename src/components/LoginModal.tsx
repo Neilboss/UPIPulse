@@ -7,7 +7,7 @@ import { AuthService, AuthUser } from '../lib/services/authService';
 interface LoginModalProps {
   isOpen: boolean;
   onClose?: () => void;
-  onLoginSuccess: (user: AuthUser) => void;
+  onLoginSuccess: (user: AuthUser | null) => void;
   isMandatory?: boolean;
 }
 
@@ -87,6 +87,7 @@ export function LoginModal({
   const handleLogout = () => {
     AuthService.logout();
     setCurrentUser(null);
+    onLoginSuccess(null);
     setSuccessMsg('Logged out successfully.');
     setTimeout(() => setSuccessMsg(null), 2000);
   };

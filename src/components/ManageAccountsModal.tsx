@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { X, Building2, Wallet, Plus, Check } from 'lucide-react';
+import { LocalFinanceService } from '../lib/services/localFinanceService';
 
 interface ManageAccountsModalProps {
   isOpen: boolean;
@@ -54,18 +55,28 @@ export function ManageAccountsModal({
     const cleanMask = accountMask.trim() ? (accountMask.startsWith('XX') ? accountMask : `XX${accountMask}`) : 'XX1234';
 
     try {
-      const res = await fetch('/api/accounts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: editingAccountId || undefined,
-          bankName: bankName.trim() || 'Primary Bank',
-          accountMask: cleanMask,
-          balance: numBalance,
-        }),
+      LocalFinanceService.saveAccount({
+        id: editingAccountId || undefined,
+        bank_name: bankName.trim() || 'Primary Bank',
+        account_mask: cleanMask,
+        balance: numBalance,
+        balance_updated_at: new Date().toISOString(),
       });
 
-      if (!res.ok) throw new Error('Failed to update account');
+      try {
+        await fetch('/api/accounts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: editingAccountId || undefined,
+            bankName: bankName.trim() || 'Primary Bank',
+            accountMask: cleanMask,
+            balance: numBalance,
+          }),
+        });
+      } catch {
+        // Offline / native Android mode
+      }
 
       onSuccess();
       resetForm();

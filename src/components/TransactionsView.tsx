@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Filter, AlertCircle, ArrowUpRight, ArrowDownLeft, X, Trash2, Check, FileText, Plus, Users } from 'lucide-react';
+import { LocalFinanceService } from '../lib/services/localFinanceService';
 
 interface TransactionsViewProps {
   transactions: any[];
@@ -32,6 +33,12 @@ export function TransactionsView({
   const [editAmount, setEditAmount] = useState<number>(0);
   const [editInternal, setEditInternal] = useState(0);
 
+  useEffect(() => {
+    if (initialFilter === 'needsReview') {
+      setSelectedType('needsReview');
+    }
+  }, [initialFilter]);
+
   const openEditModal = (txn: any) => {
     setActiveModalTxn(txn);
     setEditMerchant(txn.merchant || '');
@@ -46,21 +53,32 @@ export function TransactionsView({
     if (!activeModalTxn) return;
     setIsSaving(true);
     try {
-      const res = await fetch(`/api/transactions/${activeModalTxn.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          merchant: editMerchant,
-          category: editCategory,
-          type: editType,
-          amount: editAmount,
-          is_internal_transfer: editInternal,
-        }),
+      LocalFinanceService.updateTransaction(activeModalTxn.id, {
+        merchant: editMerchant,
+        category: editCategory,
+        type: editType,
+        amount: editAmount,
+        is_internal_transfer: editInternal,
       });
-      if (res.ok) {
-        setActiveModalTxn(null);
-        onRefresh();
+
+      try {
+        await fetch(`/api/transactions/${activeModalTxn.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            merchant: editMerchant,
+            category: editCategory,
+            type: editType,
+            amount: editAmount,
+            is_internal_transfer: editInternal,
+          }),
+        });
+      } catch {
+        // Offline / local transaction
       }
+
+      setActiveModalTxn(null);
+      onRefresh();
     } catch (e) {
       console.error(e);
     } finally {
@@ -72,13 +90,18 @@ export function TransactionsView({
     if (!activeModalTxn) return;
     if (!confirm('Are you sure you want to delete this transaction?')) return;
     try {
-      const res = await fetch(`/api/transactions/${activeModalTxn.id}`, {
-        method: 'DELETE',
-      });
-      if (res.ok) {
-        setActiveModalTxn(null);
-        onRefresh();
+      LocalFinanceService.deleteTransaction(activeModalTxn.id);
+
+      try {
+        await fetch(`/api/transactions/${activeModalTxn.id}`, {
+          method: 'DELETE',
+        });
+      } catch {
+        // Offline / local transaction
       }
+
+      setActiveModalTxn(null);
+      onRefresh();
     } catch (e) {
       console.error(e);
     }

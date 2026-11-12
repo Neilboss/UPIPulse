@@ -25,9 +25,9 @@ export const BANK_PATTERNS: BankPattern[] = [
     source: 'Bank SMS',
     identify: (text) => /\bHDFC\s*Bank\b/i.test(text),
     extract: (text) => {
-      const isDebit = /\bdebited\b/i.test(text);
-      const isCredit = /\bcredited\b/i.test(text);
-      const isRefund = /\brefund\b/i.test(text);
+      const isDebit = /\b(debited|sent|withdrawn|spent|paid)\b/i.test(text);
+      const isCredit = /\b(credited|received|deposited)\b/i.test(text);
+      const isRefund = /\b(refund|refunded|reversed)\b/i.test(text);
 
       const type: TransactionType = isRefund ? 'REFUND' : isDebit ? 'DEBIT' : isCredit ? 'CREDIT' : 'UNKNOWN';
 
@@ -40,7 +40,7 @@ export const BANK_PATTERNS: BankPattern[] = [
       const balMatch = text.match(/Av(?:ai)?l\s+bal(?:ance)?\s*[:\s]*₹\s*([\d]+(?:\.\d{1,2})?)/i);
       const balanceAfter = balMatch ? parseFloat(balMatch[1]) : null;
 
-      const refMatch = text.match(/(?:UPI\s+ref(?:\s+no\.?)?|ref(?:\s+no\.?)?)\s*[:\s]*(\d{8,16})/i);
+      const refMatch = text.match(/(?:UPI\s+ref(?:\s+no\.?)?|ref(?:\s+no\.?)?|utr)\s*[:\s]*(\d{8,16})/i);
       const refId = refMatch ? refMatch[1] : null;
 
       let merchant: string | null = null;
@@ -48,8 +48,17 @@ export const BANK_PATTERNS: BankPattern[] = [
       if (vpaMatch) {
         merchant = vpaMatch[1];
       } else {
-        const toMatch = text.match(/(?:to|at|info:)\s+([A-Za-z0-9\s._&-]{2,30}?)(?=\s+(?:on|via|ref|bal|avl)|\.|$)/i);
-        if (toMatch) merchant = toMatch[1].trim();
+        const toMatch = text.match(
+          isCredit || isRefund
+            ? /\b(?:as\s+refund\s+from|by|from)\s+([A-Za-z0-9\s._&-]{2,30}?)(?=\s+(?:on|via|ref|utr|bal|avl|\(ref)|\.|$)/i
+            : /\b(?:to|at|for|info:)\s+([A-Za-z0-9\s._&-]{2,30}?)(?=\s+(?:on|via|ref|utr|bal|avl|\(ref)|\.|$)/i
+        );
+        if (toMatch) {
+          const candidate = toMatch[1].trim();
+          if (!/^a\/c\b/i.test(candidate) && !/^hdfc\s+bank/i.test(candidate)) {
+            merchant = candidate;
+          }
+        }
       }
 
       return {
@@ -71,9 +80,9 @@ export const BANK_PATTERNS: BankPattern[] = [
     source: 'Bank SMS',
     identify: (text) => /\bSBI\b/i.test(text),
     extract: (text) => {
-      const isDebit = /\bdebited\b/i.test(text);
-      const isCredit = /\bcredited\b/i.test(text);
-      const isRefund = /\brefund\b/i.test(text);
+      const isDebit = /\b(debited|sent|withdrawn|spent)\b/i.test(text);
+      const isCredit = /\b(credited|received|deposited)\b/i.test(text);
+      const isRefund = /\b(refund|refunded|reversed)\b/i.test(text);
       const type: TransactionType = isRefund ? 'REFUND' : isDebit ? 'DEBIT' : isCredit ? 'CREDIT' : 'UNKNOWN';
 
       const amtMatch = text.match(/₹\s*([\d]+(?:\.\d{1,2})?)/i);
@@ -82,19 +91,24 @@ export const BANK_PATTERNS: BankPattern[] = [
       const acctMatch = text.match(/A\/c\s+(?:no\.?\s*)?(?:[*Xx]+)(\d{3,4})/i);
       const accountMask = acctMatch ? `XX${acctMatch[1]}` : null;
 
-      const balMatch = text.match(/\bBal(?:ance)?\s*[:\s]*₹\s*([\d]+(?:\.\d{1,2})?)/i);
+      const balMatch = text.match(/(?:Av(?:ai)?l\s+)?\bBal(?:ance)?\s*[:\s]*₹\s*([\d]+(?:\.\d{1,2})?)/i);
       const balanceAfter = balMatch ? parseFloat(balMatch[1]) : null;
 
       let refId: string | null = null;
       let merchant: string | null = null;
 
-      const upiCompound = text.match(/UPI\/(\d{8,16})\/([A-Za-z0-9_-]+)/i);
+      const upiCompound = text.match(/UPI\/(\d{8,16})\/([A-Za-z0-9\s._&-]+?)(?=\.|\s+Bal|$)/i);
       if (upiCompound) {
         refId = upiCompound[1];
         merchant = upiCompound[2].trim();
       } else {
-        const refMatch = text.match(/\b(?:ref(?:\s+no\.?)?|rrn)\s*[:\s]*(\d{8,16})/i);
+        const refMatch = text.match(/\b(?:ref(?:\s+no\.?)?|rrn|utr)\s*[:\s]*(\d{8,16})/i);
         if (refMatch) refId = refMatch[1];
+
+        const byUpi = text.match(/\b(?:by\s+UPI|to|at|by)\s+([A-Za-z0-9\s._&-]{2,25}?)(?=\.|\s+on\b|\s+Bal\b|\s+Ref\b|$)/i);
+        if (byUpi && !/^\₹?\d/.test(byUpi[1].trim())) {
+          merchant = byUpi[1].trim();
+        }
       }
 
       return {
@@ -116,9 +130,9 @@ export const BANK_PATTERNS: BankPattern[] = [
     source: 'Bank SMS',
     identify: (text) => /\bICICI\b/i.test(text) || /\bAcct\s+XX\d{3,4}\b/i.test(text),
     extract: (text) => {
-      const isDebit = /\bdebited\b/i.test(text) || /\bwithdrawal\b/i.test(text);
-      const isCredit = /\bcredited\b/i.test(text);
-      const isRefund = /\brefund\b/i.test(text);
+      const isDebit = /\b(debited|withdrawal|withdrawn|spent|sent)\b/i.test(text);
+      const isCredit = /\b(credited|received|deposited)\b/i.test(text);
+      const isRefund = /\b(refund|refunded|reversed)\b/i.test(text);
       const type: TransactionType = isRefund ? 'REFUND' : isDebit ? 'DEBIT' : isCredit ? 'CREDIT' : 'UNKNOWN';
 
       const amtMatch = text.match(/₹\s*([\d]+(?:\.\d{1,2})?)/i);
@@ -127,7 +141,7 @@ export const BANK_PATTERNS: BankPattern[] = [
       const acctMatch = text.match(/Acct\s+(?:no\.?\s*)?(?:[*Xx]+)(\d{3,4})/i);
       const accountMask = acctMatch ? `XX${acctMatch[1]}` : null;
 
-      const balMatch = text.match(/(?:Available\s+Balance\s+(?:is\s+)?|Avail\s+Bal\s*[:\s]*)₹\s*([\d]+(?:\.\d{1,2})?)/i);
+      const balMatch = text.match(/(?:Available\s+Balance\s+(?:is\s+)?|Av(?:ai)?l\s+Bal(?:ance)?\s*[:\s]*)₹\s*([\d]+(?:\.\d{1,2})?)/i);
       const balanceAfter = balMatch ? parseFloat(balMatch[1]) : null;
 
       let refId: string | null = null;
@@ -138,8 +152,25 @@ export const BANK_PATTERNS: BankPattern[] = [
         merchant = infoUpi[1].trim();
         refId = infoUpi[2];
       } else {
+        const refMatch = text.match(/\b(?:utr|ref(?:\s+no\.?)?|rrn)\s*[:\s]*(\d{8,16})/i);
+        if (refMatch) refId = refMatch[1];
+
         const atmMatch = text.match(/\bfrom\s+ATM\b/i);
-        if (atmMatch) merchant = 'ATM Cash Withdrawal';
+        if (atmMatch) {
+          merchant = 'ATM Cash Withdrawal';
+        } else {
+          const toMatch = text.match(
+            isCredit
+              ? /\b(?:from|by)\s+([A-Za-z0-9\s._&-]{2,30}?)(?=\.|\s+on\b|\s+Av(?:ai)?l|\s+Available|\s+UTR|$)/i
+              : /\b(?:for|at|to)\s+([A-Za-z0-9\s._&-]{2,30}?)(?=\.|\s+on\b|\s+Av(?:ai)?l|\s+Available|\s+UTR|$)/i
+          );
+          if (toMatch) {
+            const candidate = toMatch[1].trim();
+            if (!/icici|acct/i.test(candidate)) {
+              merchant = candidate;
+            }
+          }
+        }
       }
 
       return {
@@ -161,9 +192,9 @@ export const BANK_PATTERNS: BankPattern[] = [
     source: 'Bank SMS',
     identify: (text) => /\bAxis\b/i.test(text) || /\bA\/c\s+no\.\s+XX\d{3,4}\b/i.test(text),
     extract: (text) => {
-      const isDebit = /\bdebited\b/i.test(text);
-      const isCredit = /\bcredited\b/i.test(text);
-      const isRefund = /\brefund\b/i.test(text);
+      const isDebit = /\b(debited|sent|withdrawn|spent)\b/i.test(text);
+      const isCredit = /\b(credited|received|deposited)\b/i.test(text);
+      const isRefund = /\b(refund|refunded|reversed)\b/i.test(text);
       const type: TransactionType = isRefund ? 'REFUND' : isDebit ? 'DEBIT' : isCredit ? 'CREDIT' : 'UNKNOWN';
 
       const amtMatch = text.match(/₹\s*([\d]+(?:\.\d{1,2})?)/i);
@@ -172,7 +203,7 @@ export const BANK_PATTERNS: BankPattern[] = [
       const acctMatch = text.match(/A\/c\s+(?:no\.?\s*)?(?:[*Xx]+)(\d{3,4})/i);
       const accountMask = acctMatch ? `XX${acctMatch[1]}` : null;
 
-      const balMatch = text.match(/\bBal(?:ance)?\s*[:\s]*₹\s*([\d]+(?:\.\d{1,2})?)/i);
+      const balMatch = text.match(/(?:Av(?:ai)?l\s+)?\bBal(?:ance)?\s*[:\s]*₹\s*([\d]+(?:\.\d{1,2})?)/i);
       const balanceAfter = balMatch ? parseFloat(balMatch[1]) : null;
 
       let refId: string | null = null;
@@ -182,6 +213,14 @@ export const BANK_PATTERNS: BankPattern[] = [
       if (upiMatch) {
         merchant = upiMatch[1].trim();
         refId = upiMatch[2];
+      } else {
+        const refMatch = text.match(/\b(?:ref(?:\s+no\.?)?|utr|rrn)\s*[:\s]*(\d{6,16})/i);
+        if (refMatch) refId = refMatch[1];
+
+        const toMatch = text.match(/\b(?:to|at|for)\s+([A-Za-z0-9\s._&-]{2,25}?)(?=\.|\s+on\b|\s+Avl\b|\s+Bal\b|\s+Ref\b|$)/i);
+        if (toMatch && !/a\/c/i.test(toMatch[1])) {
+          merchant = toMatch[1].trim();
+        }
       }
 
       return {
@@ -275,10 +314,11 @@ export const BANK_PATTERNS: BankPattern[] = [
     bankName: 'Google Pay',
     source: 'UPI',
     identify: (text) =>
-      /\bGoogle\s*Pay\b/i.test(text) ||
-      /\b(?:Paid|You\s+paid)\s+₹\s*[\d.]+\s+to\b/i.test(text) ||
-      /\b₹[\d.]+\s+received\s+from\b/i.test(text) ||
-      /\bMoney\s+received!\s+₹/i.test(text),
+      !/\b(PhonePe|Paytm)\b/i.test(text) &&
+      (/\bGoogle\s*Pay\b/i.test(text) ||
+        /\b(?:Paid|You\s+paid)\s+₹\s*[\d.]+\s+to\b/i.test(text) ||
+        /\b₹[\d.]+\s+received\s+from\b/i.test(text) ||
+        /\bMoney\s+received!\s+₹/i.test(text)),
     extract: (text) => {
       const isCredit = /\breceived\b/i.test(text);
       const type: TransactionType = isCredit ? 'CREDIT' : 'DEBIT';
@@ -286,12 +326,15 @@ export const BANK_PATTERNS: BankPattern[] = [
       const amtMatch = text.match(/₹\s*([\d]+(?:\.\d{1,2})?)/i);
       const amount = amtMatch ? parseFloat(amtMatch[1]) : null;
 
+      const refMatch = text.match(/\b(?:UTR|UPI\s+ref(?:\s+no\.?)?|Ref(?:\s+no\.?)?)\s*[:\s]*([A-Za-z0-9]{8,20})/i);
+      const refId = refMatch ? refMatch[1] : null;
+
       let merchant: string | null = null;
       if (isCredit) {
-        const fromMatch = text.match(/(?:received\s+from|from)\s+([A-Za-z0-9\s._&-]+?)(?=\.|$)/i);
+        const fromMatch = text.match(/(?:received\s+from|from)\s+([A-Za-z0-9\s._&-]+?)(?=\s+via\b|\s+on\b|\.|$)/i);
         if (fromMatch) merchant = fromMatch[1].trim();
       } else {
-        const toMatch = text.match(/(?:Paid|You\s+paid)\s+₹\s*[\d.]+\s+to\s+([A-Za-z0-9\s._&-]+?)(?=\.|$)/i);
+        const toMatch = text.match(/(?:Paid|You\s+paid)\s+₹\s*[\d.]+\s+to\s+([A-Za-z0-9\s._&-]+?)(?=\s+via\b|\s+using\b|\s+on\b|\.|$)/i);
         if (toMatch) merchant = toMatch[1].trim();
       }
 
@@ -301,7 +344,7 @@ export const BANK_PATTERNS: BankPattern[] = [
         merchant,
         accountMask: null,
         balanceAfter: null,
-        refId: null,
+        refId,
         transactionAt: null,
       };
     },
@@ -323,17 +366,25 @@ export const BANK_PATTERNS: BankPattern[] = [
       const amtMatch = text.match(/₹\s*([\d]+(?:\.\d{1,2})?)/i);
       const amount = amtMatch ? parseFloat(amtMatch[1]) : null;
 
+      const refMatch = text.match(/\b(?:UTR|Transaction\s+ID|Ref(?:\s+no\.?)?)\s*[:\s]*([A-Za-z0-9]{8,22})/i);
+      const refId = refMatch ? refMatch[1] : null;
+
       let merchant: string | null = null;
       let accountMask: string | null = null;
 
       const acctMatch = text.match(/A\/c\s+(?:[*Xx]+)(\d{3,4})/i);
       if (acctMatch) accountMask = `XX${acctMatch[1]}`;
 
-      const toMatch = text.match(/(?:Paid|sent\s+to)\s+([A-Za-z0-9\s._&-]+?)(?=\.|\s+using|$)/i);
-      if (toMatch) {
-        const candidate = toMatch[1].trim();
-        if (!candidate.startsWith('A/c')) {
-          merchant = candidate;
+      if (isCredit) {
+        const fromMatch = text.match(/(?:received\s+from|from)\s+([A-Za-z0-9\s._&-]+?)(?=\s+using\b|\s+via\b|\s+on\b|\.|$)/i);
+        if (fromMatch) merchant = fromMatch[1].trim();
+      } else {
+        const toMatch = text.match(/(?:Paid\s+₹\s*[\d.]+\s+to|Paid|sent\s+to)\s+([A-Za-z0-9\s._&-]+?)(?=\.|\s+using\b|\s+via\b|\s+on\b|$)/i);
+        if (toMatch) {
+          const candidate = toMatch[1].trim();
+          if (!candidate.startsWith('A/c')) {
+            merchant = candidate;
+          }
         }
       }
 
@@ -343,7 +394,7 @@ export const BANK_PATTERNS: BankPattern[] = [
         merchant,
         accountMask,
         balanceAfter: null,
-        refId: null,
+        refId,
         transactionAt: null,
       };
     },

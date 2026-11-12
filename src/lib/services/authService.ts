@@ -10,11 +10,14 @@ export interface AuthUser {
 export class AuthService {
   private static AUTH_KEY = 'upipulse_auth_user';
   private static CREDS_KEY = 'upipulse_held_credentials';
+  private static LOGOUT_KEY = 'upipulse_logged_out';
 
   // Default demo / dummy credentials
   public static readonly DEFAULT_EMAIL = 'user@upipulse.app';
   public static readonly DEFAULT_PASSWORD = 'password123';
   public static readonly DEFAULT_NAME = 'Neil';
+
+  private static memoryStore: Record<string, string> = {};
 
   private static isBrowser(): boolean {
     return typeof window !== 'undefined';
@@ -24,21 +27,17 @@ export class AuthService {
    * Retrieves held dummy credentials or returns defaults
    */
   public static getHeldCredentials(): { email: string; password: string; name: string } {
-    if (!this.isBrowser()) {
-      return {
-        email: this.DEFAULT_EMAIL,
-        password: this.DEFAULT_PASSWORD,
-        name: this.DEFAULT_NAME,
-      };
-    }
-
-    try {
-      const raw = localStorage.getItem(this.CREDS_KEY);
-      if (raw) {
-        return JSON.parse(raw);
+    if (this.isBrowser()) {
+      try {
+        const raw = localStorage.getItem(this.CREDS_KEY);
+        if (raw) {
+          return JSON.parse(raw);
+        }
+      } catch {
+        // Fallback
       }
-    } catch {
-      // Fallback
+    } else if (this.memoryStore[this.CREDS_KEY]) {
+      return JSON.parse(this.memoryStore[this.CREDS_KEY]);
     }
 
     const defaultCreds = {
@@ -54,15 +53,18 @@ export class AuthService {
    * Updates held dummy credentials
    */
   public static saveHeldCredentials(email: string, password: string, name = 'Neil'): void {
+    const payload = JSON.stringify({
+      email: email.trim().toLowerCase(),
+      password,
+      name,
+    });
+    this.memoryStore[this.CREDS_KEY] = payload;
     if (!this.isBrowser()) return;
-    localStorage.setItem(
-      this.CREDS_KEY,
-      JSON.stringify({
-        email: email.trim().toLowerCase(),
-        password,
-        name,
-      })
-    );
+    try {
+      localStorage.setItem(this.CREDS_KEY, payload);
+    } catch {
+      // Ignore storage errors
+    }
   }
 
   /**
@@ -70,6 +72,10 @@ export class AuthService {
    */
   public static getCurrentUser(): AuthUser | null {
     if (!this.isBrowser()) {
+      if (this.memoryStore[this.LOGOUT_KEY] === 'true') return null;
+      if (this.memoryStore[this.AUTH_KEY]) {
+        return JSON.parse(this.memoryStore[this.AUTH_KEY]);
+      }
       return {
         id: 'usr_default',
         email: this.DEFAULT_EMAIL,
@@ -79,9 +85,23 @@ export class AuthService {
     }
 
     try {
-      const raw = localStorage.getItem(this.AUTH_KEY);
+      const raw = localStorage.getItem(this.AUTH_KEY) || sessionStorage.getItem(this.AUTH_KEY);
       if (raw) {
         return JSON.parse(raw);
+      }
+
+      // Auto-login with held dummy credentials if user has not explicitly logged out
+      if (localStorage.getItem(this.LOGOUT_KEY) !== 'true') {
+        const held = this.getHeldCredentials();
+        const autoUser: AuthUser = {
+          id: 'usr_demo',
+          email: held.email,
+          name: held.name || this.DEFAULT_NAME,
+          isLoggedIn: true,
+          loggedInAt: new Date().toISOString(),
+        };
+        localStorage.setItem(this.AUTH_KEY, JSON.stringify(autoUser));
+        return autoUser;
       }
     } catch {
       // Ignore
@@ -130,11 +150,20 @@ export class AuthService {
       loggedInAt: new Date().toISOString(),
     };
 
+    const serialized = JSON.stringify(user);
+    this.memoryStore[this.AUTH_KEY] = serialized;
+    delete this.memoryStore[this.LOGOUT_KEY];
+
     if (this.isBrowser()) {
-      if (remember) {
-        localStorage.setItem(this.AUTH_KEY, JSON.stringify(user));
-      } else {
-        sessionStorage.setItem(this.AUTH_KEY, JSON.stringify(user));
+      try {
+        localStorage.removeItem(this.LOGOUT_KEY);
+        if (remember) {
+          localStorage.setItem(this.AUTH_KEY, serialized);
+        } else {
+          sessionStorage.setItem(this.AUTH_KEY, serialized);
+        }
+      } catch {
+        // Ignore storage errors
       }
     }
 
@@ -145,8 +174,15 @@ export class AuthService {
    * Logs out the user
    */
   public static logout(): void {
+    delete this.memoryStore[this.AUTH_KEY];
+    this.memoryStore[this.LOGOUT_KEY] = 'true';
     if (!this.isBrowser()) return;
-    localStorage.removeItem(this.AUTH_KEY);
-    sessionStorage.removeItem(this.AUTH_KEY);
+    try {
+      localStorage.removeItem(this.AUTH_KEY);
+      sessionStorage.removeItem(this.AUTH_KEY);
+      localStorage.setItem(this.LOGOUT_KEY, 'true');
+    } catch {
+      // Ignore
+    }
   }
 }

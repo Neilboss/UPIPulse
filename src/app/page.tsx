@@ -81,8 +81,13 @@ export default function HomePage() {
     // Blend / Fallback to local on-device store if native or if local has data
     const localTxns = LocalFinanceService.getTransactions();
     const localAccs = LocalFinanceService.getAccounts();
+    const localSettings = LocalFinanceService.getSettings();
 
-    if (localTxns.length > 0 || loadedTxns.length === 0) {
+    if (localSettings.is_onboarded) {
+      isOnboarded = true;
+    }
+
+    if (localTxns.length > 0 || localAccs.length > 0 || loadedTxns.length === 0) {
       // Merge unique by ID
       const txnMap = new Map();
       [...loadedTxns, ...localTxns].forEach((t) => txnMap.set(t.id, t));
@@ -93,11 +98,16 @@ export default function HomePage() {
       });
 
       const accMap = new Map();
-      [...loadedAccounts, ...localAccs].forEach((a) => accMap.set(a.id || a.account_mask, a));
+      [...loadedAccounts, ...localAccs].forEach((a) => accMap.set(a.account_mask || a.id, a));
       loadedAccounts = Array.from(accMap.values());
 
-      if (!loadedAnalytics) {
-        loadedAnalytics = LocalFinanceService.getAnalytics();
+      // Recompute unified analytics from blended transactions & accounts
+      if (!loadedAnalytics || localTxns.length > 0 || localAccs.length > 0) {
+        loadedAnalytics = LocalFinanceService.computeAnalyticsFromData(
+          loadedTxns,
+          loadedAccounts,
+          loadedAnalytics?.monthlyBudget || localSettings.monthly_budget_total
+        );
       }
     }
 
@@ -225,7 +235,9 @@ export default function HomePage() {
         onClose={() => setShowLogin(false)}
         onLoginSuccess={(user) => {
           setCurrentUser(user);
-          setShowLogin(false);
+          if (user) {
+            setShowLogin(false);
+          }
           loadData(false);
         }}
       />

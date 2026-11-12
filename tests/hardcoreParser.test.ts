@@ -2,6 +2,7 @@ import { parseTransactionMessage } from '../src/lib/parser/smsParser';
 import { categorizeTransaction } from '../src/lib/parser/categorizer';
 import { checkDuplicateAndFuse } from '../src/lib/parser/deduplicator';
 import { LocalFinanceService } from '../src/lib/services/localFinanceService';
+import { SmsBridge } from '../src/lib/services/smsBridge';
 import { AuthService } from '../src/lib/services/authService';
 import Database from 'better-sqlite3';
 
@@ -323,6 +324,51 @@ export function runHardcoreTests() {
   assert('Fused source identifies as UPI + Bank SMS', fusionResult.fusedTransaction?.source === 'UPI + Bank SMS');
   assert('Fused transaction retains clean merchant', fusionResult.fusedTransaction?.merchant === 'Blue Tokai Coffee');
   assert('Fused transaction adds balanceAfter ₹15,000', fusionResult.fusedTransaction?.balance_after === 15000);
+
+  // ==========================================
+  // SECTION 5: SMS BRIDGE TEMPLATES & LOCAL ANALYTICS PARITY
+  // ==========================================
+  console.log('\n[Phase 5] SmsBridge Templates & Local Store Parity:');
+
+  const simMessages = SmsBridge.getSimulatedSmsMessages(90);
+  assert('SmsBridge provides 10 historical simulation messages', simMessages.length === 10);
+
+  for (const sim of simMessages) {
+    const p = parseTransactionMessage(sim.body);
+    assert(
+      `Simulated [${sim.address}] parses cleanly (${p.type} ₹${p.amount} @ ${p.merchant})`,
+      p.status === 'PARSED' && p.type !== 'UNKNOWN' && p.amount !== null && p.amount > 0,
+      `status=${p.status}, type=${p.type}, amt=${p.amount}`
+    );
+  }
+
+  const manualTxn = LocalFinanceService.addManualTransaction({
+    amount: 320,
+    type: 'DEBIT',
+    merchant: 'Chai Point',
+    category: 'Food',
+  });
+  assert('Local manual transaction created', manualTxn.amount === 320 && manualTxn.category === 'Food');
+
+  const updatedOk = LocalFinanceService.updateTransaction(manualTxn.id, { amount: 350, merchant: 'Chai Point Koramangala' });
+  assert('Local transaction updated', updatedOk);
+
+  const localAnalytics = LocalFinanceService.getAnalytics();
+  assert(
+    'Local analytics provides full Dashboard & AnalyticsView schema',
+    typeof localAnalytics.currentMonthSpend === 'number' &&
+      Array.isArray(localAnalytics.categoryBreakdown) &&
+      Array.isArray(localAnalytics.dailySpend) &&
+      Array.isArray(localAnalytics.topMerchants) &&
+      typeof localAnalytics.budgetUsedPercent === 'number' &&
+      typeof localAnalytics.safeSpendingLimit === 'number'
+  );
+
+  const csvOut = LocalFinanceService.exportDataCsv();
+  assert('Local CSV export contains headers and Chai Point', csvOut.includes('Merchant,Category') && csvOut.includes('Chai Point Koramangala'));
+
+  const deletedOk = LocalFinanceService.deleteTransaction(manualTxn.id);
+  assert('Local transaction soft-deleted', deletedOk);
 
   console.log('\n====================================================');
   console.log(`HARDCORE TESTS: ${passed + failed} | PASSED: ${passed} | FAILED: ${failed}`);
